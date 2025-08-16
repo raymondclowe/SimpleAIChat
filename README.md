@@ -49,8 +49,12 @@ A Cloudflare Workers-based AI chat interface built with TypeScript, featuring in
 
 2. **Configure Cloudflare**
    ```bash
-   # Login to Cloudflare
-   wrangler login
+   # For local/dev environments without a browser, use an API token:
+   # 1. Go to https://dash.cloudflare.com/profile/api-tokens
+   # 2. Create a token with "Edit Cloudflare Workers" permissions
+   # 3. In your project root, create a file named .env and add:
+   #    CLOUDFLARE_API_TOKEN=your_token_here
+   # Wrangler will use this token for authentication.
    
    # Create KV namespaces
    wrangler kv:namespace create "CONFIG_KV"
@@ -119,9 +123,10 @@ A Cloudflare Workers-based AI chat interface built with TypeScript, featuring in
 
 ### Environment Variables
 
-- `COPILOT_CLOUDFLARE_GLOBAL`: Cloudflare API key for Workers AI access
-- `CLOUDFLARE_ACCOUNT_ID`: Your Cloudflare account ID
-- `ENVIRONMENT`: Set to "production" for production deployment
+* `COPILOT_CLOUDFLARE_GLOBAL`: Cloudflare API key for Workers AI access
+* `CLOUDFLARE_API_TOKEN`: API token for headless authentication (recommended for remote/dev environments)
+* `CLOUDFLARE_ACCOUNT_ID`: Your Cloudflare account ID
+* `ENVIRONMENT`: Set to "production" for production deployment
 
 ### KV Namespaces
 

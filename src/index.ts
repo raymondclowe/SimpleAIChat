@@ -18,25 +18,32 @@ import {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+    console.log(`[main] ${request.method} ${url.pathname}`);
     
     // Handle CORS preflight requests
     if (request.method === 'OPTIONS') {
+      console.log('[main] CORS preflight');
       return handleCorsOptions();
     }
 
     // Health check endpoint (no authentication required)
     if (url.pathname === '/api/health') {
+      console.log('[main] Health check endpoint');
       return handleHealthCheck(request, env);
     }
 
     // Serve static assets
     if (!url.pathname.startsWith('/api/')) {
+      console.log('[main] Serving static asset');
       return await handleStaticAssets(request, env);
     }
 
     // All API endpoints require session management
+    console.log('[main] API endpoint, checking session...');
     const session = await handleSessionAuth(request, env);
+    console.log('[main] Session result:', session.success ? 'SUCCESS' : 'FAILED');
     if (!session.success) {
+      console.log('[main] Session failed, returning error response');
       return session.response!;
     }
 
@@ -58,34 +65,41 @@ export default {
 
     // Route API requests
     try {
+      console.log(`[main] Routing to ${url.pathname}`);
       switch (url.pathname) {
         case '/api/chat':
           if (request.method === 'POST') {
+            console.log('[main] Calling handleChatRequest');
             return handleChatRequest(request, env, session.session);
           }
           break;
 
         case '/api/config':
           if (request.method === 'GET') {
+            console.log('[main] Calling handleConfigGet');
             return handleConfigGet(request, env, session.session);
           } else if (request.method === 'PUT') {
+            console.log('[main] Calling handleConfigPut');
             return handleConfigPut(request, env, session.session);
           }
           break;
 
         case '/api/history':
           if (request.method === 'GET') {
+            console.log('[main] Calling handleHistoryGet');
             return handleHistoryGet(request, env, session.session);
           }
           break;
 
         case '/api/usage':
           if (request.method === 'GET') {
+            console.log('[main] Calling handleUsageRequest');
             return handleUsageRequest(request, env, session.session);
           }
           break;
 
         default:
+          console.log('[main] Unknown endpoint:', url.pathname);
           return createJsonResponse({
             success: false,
             error: {
@@ -96,6 +110,7 @@ export default {
       }
 
       // Method not allowed
+      console.log(`[main] Method ${request.method} not allowed for ${url.pathname}`);
       return createJsonResponse({
         success: false,
         error: {
@@ -118,36 +133,36 @@ export default {
 };
 
 async function handleSessionAuth(request: Request, env: Env): Promise<{ success: boolean; session?: any; response?: Response }> {
+  console.log('[session] Starting session auth');
   const sessionHeader = request.headers.get('X-Session-ID');
+  console.log('[session] Session header:', sessionHeader);
   
   if (sessionHeader) {
     // Try to get existing session
+    console.log('[session] Looking up existing session');
     const session = await getSession(env, sessionHeader);
     if (session) {
+      console.log('[session] Found existing session:', session.session_id);
+      await updateSessionActivity(env, session);
       return { success: true, session };
     }
+    console.log('[session] Session not found, creating new one');
   }
 
   // Create new session
   try {
+    console.log('[session] Creating new session');
     const userAgent = request.headers.get('User-Agent') || 'unknown';
     const newSession = await createSession(env, userAgent);
+    console.log('[session] Created new session:', newSession.session_id);
     
-    // Return session ID in response headers for client to store
-    const response = createJsonResponse({
-      success: true,
-      session_id: newSession.session_id,
-      message: 'New session created',
-    });
-    
-    response.headers.set('X-Session-ID', newSession.session_id);
-    
+    // For API requests, proceed with the new session instead of returning session creation response
     return { 
-      success: false, // Return false to send session creation response
-      response 
+      success: true, 
+      session: newSession 
     };
   } catch (error) {
-    console.error('Error creating session:', error);
+    console.error('[session] Error creating session:', error);
     return {
       success: false,
       response: createJsonResponse({

@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simple AI Chat</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f7f7fa; margin: 0; }
+    #chat-container { max-width: 600px; margin: 40px auto; background: #fff; border-radius: 8px; box-shadow: 0 2px 8px #0001; padding: 24px; }
+    #chat-window { height: 320px; overflow-y: auto; border: 1px solid #eee; border-radius: 6px; padding: 12px; background: #fafaff; margin-bottom: 16px; }
+    .message { margin-bottom: 12px; }
+    .user { color: #2a7ae2; font-weight: bold; }
+    .ai { color: #333; }
+    #usage-dashboard { font-size: 0.95em; color: #666; margin-bottom: 12px; }
+    #model-select { margin-bottom: 12px; }
+    #config-btn { float: right; margin-top: -8px; }
+    #chat-form { display: flex; gap: 8px; }
+    #chat-input { flex: 1; padding: 8px; border-radius: 4px; border: 1px solid #ccc; }
+    #send-btn { padding: 8px 16px; border-radius: 4px; border: none; background: #2a7ae2; color: #fff; cursor: pointer; }
+    #send-btn:disabled { background: #aaa; }
+    #config-modal { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #0005; justify-content: center; align-items: center; }
+    #config-content { background: #fff; padding: 24px; border-radius: 8px; min-width: 320px; }
+    #close-config { float: right; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div id="chat-container">
+    <h2>Simple AI Chat <button id="config-btn">⚙️</button></h2>
+    <div id="usage-dashboard">Model: <span id="model-name">Llama 3.1 8B</span> | Neurons used: <span id="neurons-used">0</span> / <span id="neurons-quota">10000</span></div>
+    <select id="model-select">
+      <option value="@cf/meta/llama-3.1-8b-instruct">Llama 3.1 8B</option>
+      <option value="@cf/meta/llama-3.1-70b-instruct">Llama 3.1 70B</option>
+      <option value="@cf/microsoft/phi-2">Microsoft Phi-2</option>
+      <option value="@cf/mistral/mistral-7b-instruct-v0.1">Mistral 7B</option>
+    </select>
+    <div id="chat-window"></div>
+    <form id="chat-form">
+      <input type="text" id="chat-input" maxlength="512" placeholder="Type your message..." required />
+      <button id="send-btn" type="submit">Send</button>
+    </form>
+  </div>
+  <div id="config-modal">
+    <div id="config-content">
+      <span id="close-config">✖</span>
+      <h3>Configuration</h3>
+      <label>MCP Endpoint URL: <input type="text" id="mcp-url" placeholder="https://your-mcp-server.com/api" /></label>
+      <br><br>
+      <button id="save-config">Save</button>
+    </div>
+  </div>
+  <script>
+    const chatWindow = document.getElementById('chat-window');
+    const chatForm = document.getElementById('chat-form');
+    const chatInput = document.getElementById('chat-input');
+    const sendBtn = document.getElementById('send-btn');
+    const modelSelect = document.getElementById('model-select');
+    const modelName = document.getElementById('model-name');
+    const neuronsUsed = document.getElementById('neurons-used');
+    const neuronsQuota = document.getElementById('neurons-quota');
+    const configBtn = document.getElementById('config-btn');
+    const configModal = document.getElementById('config-modal');
+    const closeConfig = document.getElementById('close-config');
+    const saveConfig = document.getElementById('save-config');
+    const mcpUrl = document.getElementById('mcp-url');
+
+    let history = [];
+    let usage = { neurons_used: 0, quota: 10000 };
+    let config = { mcp_url: '' };
+
+    function renderHistory() {
+      chatWindow.innerHTML = '';
+      history.forEach(msg => {
+        const div = document.createElement('div');
+        div.className = 'message';
+        div.innerHTML = `<span class="${msg.role}">${msg.role === 'user' ? 'You' : 'AI'}:</span> ${msg.content}`;
+        chatWindow.appendChild(div);
+      });
+      chatWindow.scrollTop = chatWindow.scrollHeight;
+    }
+
+    chatForm.onsubmit = async (e) => {
+      e.preventDefault();
+      const message = chatInput.value.trim();
+      if (!message) return;
+      sendBtn.disabled = true;
+      history.push({ role: 'user', content: message });
+      renderHistory();
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message, model: modelSelect.value, context: history.map(m => m.content) })
+        });
+        const data = await res.json();
+        if (data.success && data.data && data.data.response) {
+          history.push({ role: 'ai', content: data.data.response });
+          usage.neurons_used = data.data.usage?.neurons_used || usage.neurons_used;
+          neuronsUsed.textContent = usage.neurons_used;
+          renderHistory();
+        } else if (data.error) {
+          history.push({ role: 'ai', content: `Error: ${data.error.message}` });
+          renderHistory();
+        }
+      } catch (err) {
+        history.push({ role: 'ai', content: 'Network error.' });
+        renderHistory();
+      }
+      chatInput.value = '';
+      sendBtn.disabled = false;
+    };
+
+    modelSelect.onchange = () => {
+      modelName.textContent = modelSelect.options[modelSelect.selectedIndex].text;
+    };
+
+    configBtn.onclick = () => {
+      configModal.style.display = 'flex';
+      mcpUrl.value = config.mcp_url;
+    };
+    closeConfig.onclick = () => {
+      configModal.style.display = 'none';
+    };
+    saveConfig.onclick = async () => {
+      config.mcp_url = mcpUrl.value;
+      await fetch('/api/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config)
+      });
+      configModal.style.display = 'none';
+    };
+
+    // Initial load: fetch config and usage
+    (async () => {
+      const configRes = await fetch('/api/config');
+      if (configRes.ok) {
+        const configData = await configRes.json();
+        config = configData.data || configData;
+      }
+      mcpUrl.value = config.mcp_url || '';
+      const usageRes = await fetch('/api/usage');
+      if (usageRes.ok) {
+        const usageData = await usageRes.json();
+        usage = usageData.data || usageData;
+      }
+      neuronsUsed.textContent = usage.neurons_used || 0;
+      neuronsQuota.textContent = usage.quota || 10000;
+      // Optionally fetch history
+      const histRes = await fetch('/api/history');
+      if (histRes.ok) {
+        const histData = await histRes.json();
+        history = (histData.data && histData.data.messages) ? histData.data.messages : histData.messages || [];
+      }
+      renderHistory();
+    })();
+  </script>
+</body>
+</html>

@@ -46,30 +46,36 @@ export const AVAILABLE_MODELS: AIModel[] = [
 export async function handleChatRequest(request: Request, env: Env, session: any): Promise<Response> {
   try {
     const body = await request.json() as ChatRequest;
+    console.log('[chat] Incoming body:', JSON.stringify(body));
     
     // Sanitize and validate input
     const message = sanitizeInput(body.message);
+    console.log('[chat] Sanitized message:', message);
     if (!message || message.length === 0) {
       const error: ChatError = {
         error: 'invalid_input',
         message: 'Message cannot be empty',
       };
+      console.log('[chat] Invalid input:', error);
       return createJsonResponse({ success: false, error }, 400);
     }
 
     // Validate model
     const model = body.model || '@cf/meta/llama-3.1-8b-instruct';
+    console.log('[chat] Model:', model);
     if (!isValidModel(model)) {
       const error: ChatError = {
         error: 'invalid_model',
         message: 'Selected model is not available',
       };
+      console.log('[chat] Invalid model:', error);
       return createJsonResponse({ success: false, error }, 400);
     }
 
     // Prepare context for AI model
     const context = body.context || [];
     const maxTokens = Math.min(body.max_tokens || 150, 2048);
+    console.log('[chat] Context:', context, 'Max tokens:', maxTokens);
 
     // Build conversation context
     let conversationContext = '';
@@ -77,22 +83,28 @@ export async function handleChatRequest(request: Request, env: Env, session: any
       conversationContext = context.join('\n') + '\n';
     }
     conversationContext += `Human: ${message}\nAssistant:`;
+    console.log('[chat] Conversation context:', conversationContext);
 
     // Call Cloudflare AI API
     const aiResponse = await callCloudflareAI(env, model, conversationContext, maxTokens);
+    console.log('[chat] AI response:', aiResponse);
     
     if (!aiResponse.success || !aiResponse.response) {
+      console.log('[chat] AI error:', aiResponse.error);
       return createJsonResponse({ success: false, error: aiResponse.error }, 500);
     }
 
     // Estimate neuron usage (rough calculation)
     const neuronsUsed = estimateNeuronUsage(message, aiResponse.response, model);
+    console.log('[chat] Neurons used:', neuronsUsed);
     
     // Update session neuron usage
     await updateNeuronUsage(env, session, neuronsUsed);
+    console.log('[chat] Updated neuron usage for session:', session.session_id);
 
     // Save chat message to history
     await saveChatMessage(env, session.session_id, message, aiResponse.response, model, neuronsUsed);
+    console.log('[chat] Saved chat message to history');
 
     // Prepare response
     const response: ChatResponse = {
@@ -104,11 +116,12 @@ export async function handleChatRequest(request: Request, env: Env, session: any
       model_used: model,
       timestamp: getCurrentTimestamp(),
     };
+    console.log('[chat] Final response:', response);
 
     return createJsonResponse({ success: true, data: response });
 
   } catch (error) {
-    console.error('Error handling chat request:', error);
+    console.error('[chat] Error handling chat request:', error);
     const errorResponse: ChatError = {
       error: 'internal_error',
       message: 'An internal error occurred while processing your request',

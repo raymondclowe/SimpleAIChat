@@ -135,7 +135,10 @@ export function isValidModel(model: string): boolean {
     '@cf/microsoft/phi-2',
     '@cf/mistral/mistral-7b-instruct-v0.1',
   ];
-  return validModels.includes(model);
+  console.log('[utils] Checking model:', model, 'Valid models:', validModels);
+  const isValid = validModels.includes(model);
+  console.log('[utils] Model is valid:', isValid);
+  return isValid;
 }
 
 // Create CORS headers

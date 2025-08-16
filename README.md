@@ -42,7 +42,7 @@ A Cloudflare Workers-based AI chat interface built with TypeScript, featuring in
 
 1. **Clone and Install Dependencies**
    ```bash
-   git clone <repository-url>
+   git clone [<repository-url>](https://github.com/raymondclowe/SimpleAIChat)
    cd SimpleAIChat
    npm install
    ```

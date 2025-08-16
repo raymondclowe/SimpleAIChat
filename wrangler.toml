@@ -1,0 +1,28 @@
+name = "simple-ai-chat"
+main = "src/index.ts"
+compatibility_date = "2024-12-18"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+ENVIRONMENT = "development"
+CLOUDFLARE_ACCOUNT_ID = "your-account-id-here"
+
+# KV Namespaces for data storage
+[[kv_namespaces]]
+binding = "CONFIG_KV"
+preview_id = "config-kv-preview"
+id = "config-kv-production"
+
+[[kv_namespaces]]
+binding = "SESSIONS_KV"
+preview_id = "sessions-kv-preview"
+id = "sessions-kv-production"
+
+[[kv_namespaces]]
+binding = "CHAT_HISTORY_KV"
+preview_id = "chat-history-kv-preview"
+id = "chat-history-kv-production"
+
+# Static Assets configuration (2024 best practice)
+[assets]
+directory = "./public"

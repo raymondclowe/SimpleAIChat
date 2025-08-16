@@ -1,11 +1,15 @@
+/// <reference types='@cloudflare/workers-types' />
 // Environment bindings for Cloudflare Workers
 export interface Env {
   CONFIG_KV: KVNamespace;
   SESSIONS_KV: KVNamespace;
   CHAT_HISTORY_KV: KVNamespace;
   COPILOT_CLOUDFLARE_GLOBAL: string;
+  CLOUDFLARE_AI_API_TOKEN: string;
   CLOUDFLARE_ACCOUNT_ID: string;
   ENVIRONMENT: string;
+  // Workers AI binding (automatically available if account has Workers AI enabled)
+  AI?: any;
 }
 
 // Chat API types

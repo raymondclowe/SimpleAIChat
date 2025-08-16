@@ -37,6 +37,177 @@ export default {
       console.log('[main] Serving static asset');
       return await handleStaticAssets(request, env);
     }
+    
+  // Get available Workers AI models from Cloudflare API
+  async function handleModelsGet(request: Request, env: Env): Promise<Response> {
+    try {
+      console.log('[models] Fetching live model list from Cloudflare API...');
+      
+      // Use the correct Cloudflare API endpoint for Workers AI models
+      const apiUrl = `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/ai/models/search?per_page=50`;
+      
+      console.log('[models] API URL:', apiUrl);
+      
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${env.CLOUDFLARE_AI_API_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      console.log('[models] API response status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[models] Cloudflare API error:', response.status, errorText);
+        
+        // Fallback to a curated list of known working models
+        console.log('[models] Falling back to curated model list');
+        const fallbackModels = [
+          {
+            id: '@cf/meta/llama-3.1-8b-instruct',
+            name: 'Llama 3.1 8B Instruct',
+            description: 'Fast and efficient model for general conversations',
+            max_tokens: 2048,
+          },
+          {
+            id: '@cf/meta/llama-3.1-70b-instruct',
+            name: 'Llama 3.1 70B Instruct',
+            description: 'Large model with superior reasoning capabilities',
+            max_tokens: 4096,
+          },
+          {
+            id: '@cf/microsoft/phi-2',
+            name: 'Microsoft Phi-2',
+            description: 'Compact model optimized for coding tasks',
+            max_tokens: 1024,
+          },
+          {
+            id: '@cf/mistral/mistral-7b-instruct-v0.1',
+            name: 'Mistral 7B Instruct',
+            description: 'Balanced model for instruction following',
+            max_tokens: 2048,
+          },
+          {
+            id: '@cf/qwen/qwen1.5-14b-chat-awq',
+            name: 'Qwen 1.5 14B Chat',
+            description: 'Advanced model with strong reasoning capabilities',
+            max_tokens: 2048,
+          },
+          {
+            id: '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b',
+            name: 'DeepSeek R1 Distill Qwen 32B',
+            description: 'Advanced reasoning model with problem-solving capabilities',
+            max_tokens: 4096,
+          },
+          {
+            id: '@cf/qwen/qwen2.5-coder-32b-instruct',
+            name: 'Qwen 2.5 Coder 32B Instruct',
+            description: 'State-of-the-art open-source code generation model',
+            max_tokens: 4096,
+          },
+          {
+            id: '@cf/google/gemma-3-12b-it',
+            name: 'Google Gemma 3 12B IT',
+            description: 'Latest Gemma model with 128K context and multilingual support',
+            max_tokens: 8192,
+          },
+        ];
+        
+        return new Response(
+          JSON.stringify({ success: true, models: fallbackModels }),
+          { 
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          }
+        );
+      }
+      
+      const data = await response.json() as { result?: any[], success?: boolean };
+      console.log('[models] API response success:', data.success);
+      console.log('[models] API response result length:', data.result?.length || 0);
+      console.log('[models] First few models:', JSON.stringify(data.result?.slice(0, 3) || []));
+      
+      if (!data.success) {
+        throw new Error('API returned success: false');
+      }
+      
+      if (!data.result || data.result.length === 0) {
+        console.log('[models] No models returned from API, using fallback');
+        throw new Error('No models returned from API');
+      }
+      
+      // Transform the API response to our frontend format
+      const models = data.result.map((model: any) => ({
+        id: model.name || model.id,
+        name: model.display_name || model.name || model.id,
+        description: model.description || `AI model ${model.name || model.id}`,
+        max_tokens: model.properties?.max_tokens || 2048,
+      }));
+      
+      console.log('[models] Returning', models.length, 'models from API');
+      return new Response(
+        JSON.stringify({ success: true, models }),
+        { 
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+      
+    } catch (err: any) {
+      console.error('[models] Error fetching model list:', err);
+      
+      // Fallback to curated list on any error
+      console.log('[models] Error occurred, falling back to curated model list');
+      const fallbackModels = [
+        {
+          id: '@cf/meta/llama-3.1-8b-instruct',
+          name: 'Llama 3.1 8B Instruct',
+          description: 'Fast and efficient model for general conversations',
+          max_tokens: 2048,
+        },
+        {
+          id: '@cf/meta/llama-3.1-70b-instruct',
+          name: 'Llama 3.1 70B Instruct',
+          description: 'Large model with superior reasoning capabilities',
+          max_tokens: 4096,
+        },
+        {
+          id: '@cf/microsoft/phi-2',
+          name: 'Microsoft Phi-2',
+          description: 'Compact model optimized for coding tasks',
+          max_tokens: 1024,
+        },
+        {
+          id: '@cf/mistral/mistral-7b-instruct-v0.1',
+          name: 'Mistral 7B Instruct',
+          description: 'Balanced model for instruction following',
+          max_tokens: 2048,
+        },
+        {
+          id: '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b',
+          name: 'DeepSeek R1 Distill Qwen 32B',
+          description: 'Advanced reasoning model with problem-solving capabilities',
+          max_tokens: 4096,
+        },
+        {
+          id: '@cf/qwen/qwen2.5-coder-32b-instruct',
+          name: 'Qwen 2.5 Coder 32B Instruct',
+          description: 'State-of-the-art open-source code generation model',
+          max_tokens: 4096,
+        },
+      ];
+      
+      return new Response(
+        JSON.stringify({ success: true, models: fallbackModels }),
+        { 
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+    }
+  }
 
     // All API endpoints require session management
     console.log('[main] API endpoint, checking session...');
@@ -60,222 +231,207 @@ export default {
       }, 429);
     }
 
-    // Update session activity
-    await updateSessionActivity(env, session.session);
-
-    // Route API requests
-    try {
-      console.log(`[main] Routing to ${url.pathname}`);
-      switch (url.pathname) {
-        case '/api/chat':
-          if (request.method === 'POST') {
-            console.log('[main] Calling handleChatRequest');
-            return handleChatRequest(request, env, session.session);
-          }
-          break;
-
-        case '/api/config':
-          if (request.method === 'GET') {
-            console.log('[main] Calling handleConfigGet');
-            return handleConfigGet(request, env, session.session);
-          } else if (request.method === 'PUT') {
-            console.log('[main] Calling handleConfigPut');
-            return handleConfigPut(request, env, session.session);
-          }
-          break;
-
-        case '/api/history':
-          if (request.method === 'GET') {
-            console.log('[main] Calling handleHistoryGet');
-            return handleHistoryGet(request, env, session.session);
-          }
-          break;
-
-        case '/api/usage':
-          if (request.method === 'GET') {
-            console.log('[main] Calling handleUsageRequest');
-            return handleUsageRequest(request, env, session.session);
-          }
-          break;
-
-        default:
-          console.log('[main] Unknown endpoint:', url.pathname);
-          return createJsonResponse({
+  try {
+        console.log(`[main] Routing to ${url.pathname}`);
+        switch (url.pathname) {
+            case '/api/models':
+                if (request.method === 'GET') {
+                    console.log('[main] Calling handleModelsGet');
+                    return await handleModelsGet(request, env);
+                }
+                break;
+            case '/api/chat':
+                if (request.method === 'POST') {
+                    console.log('[main] Calling handleChatRequest');
+                    return await handleChatRequest(request, env, session.session);
+                }
+                break;
+            case '/api/config':
+                if (request.method === 'GET') {
+                    console.log('[main] Calling handleConfigGet');
+                    return await handleConfigGet(request, env, session.session);
+                } else if (request.method === 'PUT') {
+                    console.log('[main] Calling handleConfigPut');
+                    return await handleConfigPut(request, env, session.session);
+                }
+                break;
+            case '/api/history':
+                if (request.method === 'GET') {
+                    console.log('[main] Calling handleHistoryGet');
+                    return await handleHistoryGet(request, env, session.session);
+                }
+                break;
+            case '/api/usage':
+                if (request.method === 'GET') {
+                    console.log('[main] Calling handleUsageRequest');
+                    return await handleUsageRequest(request, env, session.session);
+                } else {
+                    return createJsonResponse({
+                        success: false,
+                        error: {
+                            error: 'method_not_allowed',
+                            message: 'Method not allowed for /api/usage',
+                        },
+                    }, 405);
+                }
+                break;
+            default:
+                console.log('[main] Unknown endpoint:', url.pathname);
+                return createJsonResponse({
+                    success: false,
+                    error: {
+                        error: 'not_found',
+                        message: 'Endpoint not found',
+                    },
+                }, 404);
+        }
+        // Method not allowed fallback
+        console.log(`[main] Method ${request.method} not allowed for ${url.pathname}`);
+        return createJsonResponse({
             success: false,
             error: {
-              error: 'not_found',
-              message: 'Endpoint not found',
+                error: 'method_not_allowed',
+                message: 'Method not allowed for this endpoint',
             },
-          }, 404);
-      }
-
-      // Method not allowed
-      console.log(`[main] Method ${request.method} not allowed for ${url.pathname}`);
-      return createJsonResponse({
-        success: false,
-        error: {
-          error: 'method_not_allowed',
-          message: 'Method not allowed for this endpoint',
-        },
-      }, 405);
-
+        }, 405);
     } catch (error) {
-      console.error('Error processing request:', error);
-      return createJsonResponse({
-        success: false,
-        error: {
-          error: 'internal_error',
-          message: 'An internal server error occurred',
-        },
-      }, 500);
-    }
-  },
-};
+            console.error('Error processing request:', error);
+            return createJsonResponse({
+                success: false,
+                error: {
+                    error: 'internal_error',
+                    message: 'An internal server error occurred',
+                },
+            }, 500);
+        }
+            }
+        }
 
+// --- Worker helper functions ---
 async function handleSessionAuth(request: Request, env: Env): Promise<{ success: boolean; session?: any; response?: Response }> {
-  console.log('[session] Starting session auth');
-  const sessionHeader = request.headers.get('X-Session-ID');
-  console.log('[session] Session header:', sessionHeader);
+    console.log('[session] Starting session auth');
+    const sessionHeader = request.headers.get('X-Session-ID');
+    console.log('[session] Session header:', sessionHeader);
   
-  if (sessionHeader) {
-    // Try to get existing session
-    console.log('[session] Looking up existing session');
-    const session = await getSession(env, sessionHeader);
-    if (session) {
-      console.log('[session] Found existing session:', session.session_id);
-      await updateSessionActivity(env, session);
-      return { success: true, session };
+    if (sessionHeader) {
+        // Try to get existing session
+        console.log('[session] Looking up existing session');
+        const session = await getSession(env, sessionHeader);
+        if (session) {
+            console.log('[session] Found existing session:', session.session_id);
+            await updateSessionActivity(env, session);
+            return { success: true, session };
+        }
+        console.log('[session] Session not found, creating new one');
     }
-    console.log('[session] Session not found, creating new one');
-  }
 
-  // Create new session
-  try {
-    console.log('[session] Creating new session');
-    const userAgent = request.headers.get('User-Agent') || 'unknown';
-    const newSession = await createSession(env, userAgent);
-    console.log('[session] Created new session:', newSession.session_id);
-    
-    // For API requests, proceed with the new session instead of returning session creation response
-    return { 
-      success: true, 
-      session: newSession 
-    };
-  } catch (error) {
-    console.error('[session] Error creating session:', error);
-    return {
-      success: false,
-      response: createJsonResponse({
-        success: false,
-        error: {
-          error: 'session_error',
-          message: 'Failed to create session',
-        },
-      }, 500),
-    };
-  }
+    // Create new session
+    try {
+        console.log('[session] Creating new session');
+        const userAgent = request.headers.get('User-Agent') || 'unknown';
+        const newSession = await createSession(env, userAgent);
+        console.log('[session] Created new session:', newSession.session_id);
+        // For API requests, proceed with the new session instead of returning session creation response
+        return { 
+            success: true, 
+            session: newSession 
+        };
+    } catch (error) {
+        console.error('[session] Error creating session:', error);
+        return {
+            success: false,
+            response: createJsonResponse({
+                success: false,
+                error: {
+                    error: 'session_error',
+                    message: 'Failed to create session',
+                },
+            }, 500),
+        };
+    }
 }
 
 async function handleStaticAssets(request: Request, env: Env): Promise<Response> {
-  const url = new URL(request.url);
-  let pathname = url.pathname;
-
-  // Serve index.html for root path and SPA routes
-  if (pathname === '/' || (!pathname.includes('.') && !pathname.startsWith('/api/'))) {
-    pathname = '/index.html';
-  }
-
-  try {
-    // In production, this would serve from the configured static assets
-    // For now, we'll return the HTML content directly
-    if (pathname === '/index.html') {
-      return new Response(getIndexHTML(), {
-        headers: {
-          'Content-Type': 'text/html',
-          'Cache-Control': 'public, max-age=3600',
-        },
-      });
+    // Minimal static asset handler for index.html, style.css, app.js
+    const url = new URL(request.url);
+    const pathname = url.pathname;
+    if (pathname === '/' || pathname === '/index.html') {
+        return new Response(getIndexHTML(), {
+            headers: {
+                'Content-Type': 'text/html',
+                'Cache-Control': 'public, max-age=86400',
+            },
+        });
     }
-
     if (pathname === '/style.css') {
-      return new Response(getStyleCSS(), {
-        headers: {
-          'Content-Type': 'text/css',
-          'Cache-Control': 'public, max-age=86400',
-        },
-      });
+        return new Response(getStyleCSS(), {
+            headers: {
+                'Content-Type': 'text/css',
+                'Cache-Control': 'public, max-age=86400',
+            },
+        });
     }
-
     if (pathname === '/app.js') {
-      return new Response(getAppJS(), {
-        headers: {
-          'Content-Type': 'application/javascript',
-          'Cache-Control': 'public, max-age=86400',
-        },
-      });
+        return new Response(getAppJS(), {
+            headers: {
+                'Content-Type': 'application/javascript',
+                'Cache-Control': 'public, max-age=86400',
+            },
+        });
     }
-
     // File not found
     return new Response('Not Found', { status: 404 });
-  } catch (error) {
-    console.error('Error serving static asset:', error);
-    return new Response('Internal Server Error', { status: 500 });
-  }
 }
 
+// --- Frontend helpers below ---
 function getIndexHTML(): string {
-  return `<!DOCTYPE html>
+    return `<!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple AI Chat</title>
-    <link rel="stylesheet" href="/style.css">
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Simple AI Chat</title>
+        <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-    <div id="app">
-        <header>
-            <h1>🤖 Simple AI Chat</h1>
-            <div id="usage-display">
-                <span id="quota-info">Loading...</span>
-            </div>
-        </header>
+        <div id="app">
+                <header>
+                        <h1>🤖 Simple AI Chat</h1>
+                        <div id="usage-display">
+                                <span id="quota-info">Loading...</span>
+                        </div>
+                </header>
         
-        <main>
-            <div id="chat-container">
-                <div id="chat-messages"></div>
-                <div id="loading" class="hidden">AI is thinking...</div>
-            </div>
+                <main>
+                        <div id="chat-container">
+                                <div id="chat-messages"></div>
+                                <div id="loading" class="hidden">AI is thinking...</div>
+                        </div>
             
-            <div id="input-container">
-                <div id="model-selector">
-                    <label for="model-select">Model:</label>
-                    <select id="model-select">
-                        <option value="@cf/meta/llama-3.1-8b-instruct">Llama 3.1 8B (Fast)</option>
-                        <option value="@cf/meta/llama-3.1-70b-instruct">Llama 3.1 70B (Smart)</option>
-                        <option value="@cf/microsoft/phi-2">Phi-2 (Coding)</option>
-                        <option value="@cf/mistral/mistral-7b-instruct-v0.1">Mistral 7B</option>
-                    </select>
-                </div>
+                        <div id="input-container">
+                                <div id="model-selector">
+                                        <label for="model-select">Model:</label>
+                                        <select id="model-select"></select>
+                                </div>
                 
-                <div id="message-input-container">
-                    <textarea id="message-input" placeholder="Type your message here..." rows="3"></textarea>
-                    <button id="send-button">Send</button>
-                </div>
-            </div>
-        </main>
+                                <div id="message-input-container">
+                                        <textarea id="message-input" placeholder="Type your message here..." rows="3"></textarea>
+                                        <button id="send-button">Send</button>
+                                </div>
+                        </div>
+                </main>
         
-        <aside id="config-panel" class="hidden">
-            <h3>Configuration</h3>
-            <div id="config-content">
-                <!-- Config options will be loaded here -->
-            </div>
-        </aside>
-    </div>
+                <aside id="config-panel" class="hidden">
+                        <h3>Configuration</h3>
+                        <div id="config-content">
+                                <!-- Config options will be loaded here -->
+                        </div>
+                </aside>
+        </div>
     
-    <button id="config-toggle">⚙️</button>
+        <button id="config-toggle">⚙️</button>
     
-    <script src="/app.js"></script>
+        <script src="/app.js"></script>
 </body>
 </html>`;
 }
@@ -523,11 +679,50 @@ main {
 function getAppJS(): string {
   return `class SimpleAIChat {
     constructor() {
-        this.sessionId = localStorage.getItem('sessionId');
-        this.isLoading = false;
-        this.initializeApp();
-        this.loadUsageStats();
-        this.loadChatHistory();
+        try {
+            console.log('[frontend] SimpleAIChat constructor starting...');
+            this.sessionId = localStorage.getItem('sessionId');
+            this.isLoading = false;
+            console.log('[frontend] Calling initializeApp...');
+            this.initializeApp();
+            console.log('[frontend] Calling loadUsageStats...');
+            this.loadUsageStats();
+            console.log('[frontend] Calling loadChatHistory...');
+            this.loadChatHistory();
+            console.log('[frontend] Calling loadModels...');
+            this.loadModels();
+            console.log('[frontend] Constructor completed successfully');
+        } catch (error) {
+            console.error('[frontend] Constructor error:', error);
+        }
+    }
+    async loadModels() {
+        console.log('[frontend] Loading models...');
+        const modelSelect = document.getElementById('model-select');
+        modelSelect.innerHTML = '<option>Loading models...</option>';
+        try {
+            console.log('[frontend] Fetching /api/models');
+            const response = await fetch('/api/models');
+            console.log('[frontend] Models response:', response.status);
+            const data = await response.json();
+            console.log('[frontend] Models data:', data);
+            if (data.success && Array.isArray(data.models)) {
+                modelSelect.innerHTML = '';
+                data.models.forEach(model => {
+                    const opt = document.createElement('option');
+                    opt.value = model.id;
+                    opt.textContent = model.name || model.id;
+                    modelSelect.appendChild(opt);
+                });
+                console.log('[frontend] Loaded', data.models.length, 'models');
+            } else {
+                modelSelect.innerHTML = '<option>No models available</option>';
+                console.log('[frontend] No models available in response');
+            }
+        } catch (err) {
+            modelSelect.innerHTML = '<option>Error loading models</option>';
+            console.error('[frontend] Error loading models:', err);
+        }
     }
 
     async initializeApp() {

@@ -127,16 +127,21 @@ export function sanitizeInput(input: string): string {
     .slice(0, 4000); // Limit to 4000 characters
 }
 
-// Validate model name
+// Validate model name - now accepts any Cloudflare model format
 export function isValidModel(model: string): boolean {
-  const validModels = [
-    '@cf/meta/llama-3.1-8b-instruct',
-    '@cf/meta/llama-3.1-70b-instruct',
-    '@cf/microsoft/phi-2',
-    '@cf/mistral/mistral-7b-instruct-v0.1',
-  ];
-  console.log('[utils] Checking model:', model, 'Valid models:', validModels);
-  const isValid = validModels.includes(model);
+  console.log('[utils] Checking model:', model);
+  
+  // Very simple validation - just ensure it starts with @cf/ or @hf/ and has reasonable format
+  const isCloudflareModel = model.startsWith('@cf/') || model.startsWith('@hf/');
+  const hasSlashes = (model.match(/\//g) || []).length >= 1; // At least one slash
+  const notTooShort = model.length > 5;
+  const notTooLong = model.length < 100;
+  
+  console.log('[utils] Is Cloudflare/HF model:', isCloudflareModel);
+  console.log('[utils] Has slashes:', hasSlashes);
+  console.log('[utils] Length check:', notTooShort && notTooLong);
+  
+  const isValid = isCloudflareModel && hasSlashes && notTooShort && notTooLong;
   console.log('[utils] Model is valid:', isValid);
   return isValid;
 }

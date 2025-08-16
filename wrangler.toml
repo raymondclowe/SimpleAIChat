@@ -5,7 +5,7 @@ compatibility_flags = ["nodejs_compat"]
 
 [vars]
 ENVIRONMENT = "development"
-CLOUDFLARE_ACCOUNT_ID = "your-account-id-here"
+CLOUDFLARE_ACCOUNT_ID = "bcc0ffb287efd13f7d3322dccd702f8b"
 
 # KV Namespaces for data storage
 [[kv_namespaces]]
@@ -26,3 +26,7 @@ id = "d49d9e2936e74d459babae773b2587b0"
 # Static Assets configuration (2024 best practice)
 [assets]
 directory = "./public"
+
+# Workers AI binding
+[ai]
+binding = "AI"

@@ -139,6 +139,41 @@ interface CloudflareAIResult {
 
 async function callCloudflareAI(env: Env, model: string, prompt: string, maxTokens: number): Promise<{ success: boolean; response?: string; error?: ChatError }> {
   try {
+    // Prefer Workers AI binding if available (recommended way)
+    if (env.AI && typeof env.AI.run === 'function') {
+      console.log('[ai] Using Workers AI binding for model', model);
+      try {
+        const result: any = await env.AI.run(model, {
+          messages: [
+            { role: 'user', content: prompt }
+          ],
+          max_tokens: maxTokens,
+          temperature: 0.7,
+        });
+        // Workers AI binding returns { response?: string } or array of messages depending on model
+        if (result && typeof result === 'object') {
+          const direct = (result.response) || (Array.isArray(result) ? result.map((m: any)=>m.content).join('\n') : undefined);
+          if (direct) {
+            return { success: true, response: direct };
+          }
+        }
+        console.log('[ai] Unexpected AI binding result shape:', JSON.stringify(result).slice(0,500));
+      } catch (bindingErr:any) {
+        console.log('[ai] Workers AI binding failed, falling back to REST fetch:', bindingErr?.message || bindingErr);
+      }
+    } else {
+      console.log('[ai] AI binding not present; falling back to REST fetch');
+    }
+
+    // Fallback: direct REST API call (requires valid token with Workers AI permissions)
+    const tokenPresent = !!env.COPILOT_CLOUDFLARE_GLOBAL;
+    console.log('[ai] REST fallback. Token present:', tokenPresent, 'Token length:', env.COPILOT_CLOUDFLARE_GLOBAL ? env.COPILOT_CLOUDFLARE_GLOBAL.length : 0);
+    if (!tokenPresent) {
+      return {
+        success: false,
+        error: { error: 'auth_error', message: 'Missing AI API token (COPILOT_CLOUDFLARE_GLOBAL)' },
+      };
+    }
     const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/ai/run/${model}`, {
       method: 'POST',
       headers: {
@@ -158,7 +193,17 @@ async function callCloudflareAI(env: Env, model: string, prompt: string, maxToke
     });
 
     if (!response.ok) {
-      console.error('Cloudflare AI API error:', response.status, await response.text());
+      const errorText = await response.text();
+      console.error('Cloudflare AI API error:', response.status, errorText);
+      if (response.status === 401) {
+        return {
+          success: false,
+          error: {
+            error: 'auth_error',
+            message: 'Authentication failed calling Workers AI. Ensure the API token includes Workers AI permissions or use the AI binding.',
+          },
+        };
+      }
       return {
         success: false,
         error: {

@@ -8,7 +8,8 @@
     "deploy": "wrangler deploy",
     "build": "tsc",
     "lint": "eslint src --ext .ts",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "cf-typegen": "wrangler types"
   },
   "keywords": [
     "cloudflare",
@@ -27,7 +28,5 @@
     "typescript": "^5.0.0",
     "wrangler": "^4.30.0"
   },
-  "dependencies": {
-    "@cloudflare/workers-types": "^4.0.0"
-  }
+  "dependencies": {}
 }

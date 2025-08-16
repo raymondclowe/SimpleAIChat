@@ -1,53 +1,536 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Simple AI Chat</title>
-  <style>
-    body { font-family: Arial, sans-serif; background: #f7f7fa; margin: 0; }
-    #chat-container { max-width: 600px; margin: 40px auto; background: #fff; border-radius: 8px; box-shadow: 0 2px 8px #0001; padding: 24px; }
-    #chat-window { height: 320px; overflow-y: auto; border: 1px solid #eee; border-radius: 6px; padding: 12px; background: #fafaff; margin-bottom: 16px; }
-    .message { margin-bottom: 12px; }
-    .user { color: #2a7ae2; font-weight: bold; }
-    .ai { color: #333; }
-    #usage-dashboard { font-size: 0.95em; color: #666; margin-bottom: 12px; }
-    #model-select { margin-bottom: 12px; }
-    #config-btn { float: right; margin-top: -8px; }
-    #chat-form { display: flex; gap: 8px; }
-    #chat-input { flex: 1; padding: 8px; border-radius: 4px; border: 1px solid #ccc; }
-    #send-btn { padding: 8px 16px; border-radius: 4px; border: none; background: #2a7ae2; color: #fff; cursor: pointer; }
-    #send-btn:disabled { background: #aaa; }
-    #config-modal { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #0005; justify-content: center; align-items: center; }
-    #config-content { background: #fff; padding: 24px; border-radius: 8px; min-width: 320px; }
-    #close-config { float: right; cursor: pointer; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple AI Chat</title>
+    <style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    color: #333;
+}
+
+#app {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    display: grid;
+    grid-template-rows: auto 1fr;
+    grid-template-columns: 1fr auto;
+    gap: 20px;
+    min-height: 100vh;
+}
+
+header {
+    grid-column: 1 / -1;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+main {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-height: 500px;
+}
+
+#chat-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+#chat-messages {
+    flex: 1;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 16px;
+    overflow-y: auto;
+    min-height: 300px;
+    max-height: 400px;
+}
+
+.message {
+    margin-bottom: 16px;
+    padding: 12px;
+    border-radius: 8px;
+    max-width: 80%;
+    word-wrap: break-word;
+}
+
+.message.user {
+    background: #007bff;
+    color: white;
+    margin-left: auto;
+    border-bottom-right-radius: 4px;
+}
+
+.message.assistant {
+    background: #e9ecef;
+    color: #333;
+    margin-right: auto;
+    border-bottom-left-radius: 4px;
+}
+
+.message-meta {
+    font-size: 12px;
+    opacity: 0.7;
+    margin-top: 4px;
+}
+
+#loading {
+    text-align: center;
+    color: #6c757d;
+    font-style: italic;
+    padding: 16px;
+}
+
+.hidden {
+    display: none !important;
+}
+
+#input-container {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+#model-selector {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#model-select {
+    padding: 8px 12px;
+    border: 2px solid #e2e8f0;
+    border-radius: 6px;
+    background: white;
+    min-width: 250px;
+}
+
+#message-input-container {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+}
+
+#message-input {
+    flex: 1;
+    padding: 12px;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    resize: vertical;
+    font-family: inherit;
+    font-size: 14px;
+}
+
+#message-input:focus {
+    outline: none;
+    border-color: #5a67d8;
+}
+
+#send-button {
+    padding: 12px 24px;
+    background: #5a67d8;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background-color 0.2s;
+}
+
+#send-button:hover:not(:disabled) {
+    background: #4c51bf;
+}
+
+#send-button:disabled {
+    background: #a0aec0;
+    cursor: not-allowed;
+}
+
+#usage-display {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 14px;
+    color: #4a5568;
+}
+
+#quota-info {
+    background: #f7fafc;
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+}
+
+#config-panel {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    padding: 24px;
+    width: 300px;
+    max-height: fit-content;
+}
+
+#config-toggle {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: rgba(255, 255, 255, 0.9);
+    border: none;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    font-size: 24px;
+    cursor: pointer;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+}
+
+.error {
+    background: #fed7d7;
+    color: #c53030;
+    padding: 12px;
+    border-radius: 6px;
+    margin-bottom: 12px;
+    border: 1px solid #feb2b2;
+}
+
+@media (max-width: 768px) {
+    #app {
+        grid-template-columns: 1fr;
+        padding: 10px;
+    }
+    
+    #config-panel {
+        width: 100%;
+        grid-column: 1;
+    }
+    
+    header {
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
+    }
+    
+    #message-input-container {
+        flex-direction: column;
+    }
+    
+    .message {
+        max-width: 95%;
+    }
+}
+    </style>
 </head>
 <body>
-  <div id="chat-container">
-    <h2>Simple AI Chat <button id="config-btn">⚙️</button></h2>
-    <div id="usage-dashboard">Model: <span id="model-name">Llama 3.1 8B</span> | Neurons used: <span id="neurons-used">0</span> / <span id="neurons-quota">10000</span></div>
-    <select id="model-select">
-      <option value="@cf/meta/llama-3.1-8b-instruct">Llama 3.1 8B</option>
-      <option value="@cf/meta/llama-3.1-70b-instruct">Llama 3.1 70B</option>
-      <option value="@cf/microsoft/phi-2">Microsoft Phi-2</option>
-      <option value="@cf/mistral/mistral-7b-instruct-v0.1">Mistral 7B</option>
-    </select>
-    <div id="chat-window"></div>
-    <form id="chat-form">
-      <input type="text" id="chat-input" maxlength="512" placeholder="Type your message..." required />
-      <button id="send-btn" type="submit">Send</button>
-    </form>
-  </div>
-  <div id="config-modal">
-    <div id="config-content">
-      <span id="close-config">✖</span>
-      <h3>Configuration</h3>
-      <label>MCP Endpoint URL: <input type="text" id="mcp-url" placeholder="https://your-mcp-server.com/api" /></label>
-      <br><br>
-      <button id="save-config">Save</button>
+    <div id="app">
+        <header>
+            <h1>🤖 Simple AI Chat</h1>
+            <div id="usage-display">
+                <span id="quota-info">Loading...</span>
+            </div>
+        </header>
+        
+        <main>
+            <div id="chat-container">
+                <div id="chat-messages"></div>
+                <div id="loading" class="hidden">AI is thinking...</div>
+            </div>
+            
+            <div id="input-container">
+                <div id="model-selector">
+                    <label for="model-select">Model:</label>
+                    <select id="model-select"></select>
+                </div>
+                
+                <div id="message-input-container">
+                    <textarea id="message-input" placeholder="Type your message here..." rows="3"></textarea>
+                    <button id="send-button">Send</button>
+                </div>
+            </div>
+        </main>
+        
+        <aside id="config-panel" class="hidden">
+            <h3>Configuration</h3>
+            <div id="config-content">
+                <!-- Config options will be loaded here -->
+            </div>
+        </aside>
     </div>
-  </div>
+    
+    <button id="config-toggle">⚙️</button>
+    
+    <script>
+class SimpleAIChat {
+    constructor() {
+        try {
+            console.log('[frontend] SimpleAIChat constructor starting...');
+            this.sessionId = localStorage.getItem('sessionId');
+            this.isLoading = false;
+            console.log('[frontend] Calling initializeApp...');
+            this.initializeApp();
+            console.log('[frontend] Calling loadUsageStats...');
+            this.loadUsageStats();
+            console.log('[frontend] Calling loadChatHistory...');
+            this.loadChatHistory();
+            console.log('[frontend] Calling loadModels...');
+            this.loadModels();
+            console.log('[frontend] Constructor completed successfully');
+        } catch (error) {
+            console.error('[frontend] Constructor error:', error);
+        }
+    }
+
+    async initializeApp() {
+        this.bindEvents();
+        this.setupKeyboardShortcuts();
+        // Create session if needed
+        if (!this.sessionId) {
+            await this.createSession();
+        }
+    }
+
+    bindEvents() {
+        const sendButton = document.getElementById('send-button');
+        const messageInput = document.getElementById('message-input');
+        const configToggle = document.getElementById('config-toggle');
+        sendButton.addEventListener('click', () => this.sendMessage());
+        messageInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                this.sendMessage();
+            }
+        });
+        configToggle.addEventListener('click', () => this.toggleConfig());
+    }
+
+    setupKeyboardShortcuts() {
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey || e.metaKey) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.sendMessage();
+                }
+            }
+        });
+    }
+
+    async createSession() {
+        try {
+            const response = await fetch('/api/usage', {
+                method: 'GET',
+            });
+            if (response.ok) {
+                const sessionId = response.headers.get('X-Session-ID');
+                if (sessionId) {
+                    this.sessionId = sessionId;
+                    localStorage.setItem('sessionId', sessionId);
+                }
+            }
+        } catch (error) {
+            console.error('Error creating session:', error);
+        }
+    }
+
+    async loadModels() {
+        console.log('[frontend] Loading models...');
+        const modelSelect = document.getElementById('model-select');
+        modelSelect.innerHTML = '<option>Loading models...</option>';
+        try {
+            console.log('[frontend] Fetching /api/models');
+            const response = await fetch('/api/models');
+            console.log('[frontend] Models response:', response.status);
+            const data = await response.json();
+            console.log('[frontend] Models data:', data);
+            if (data.success && Array.isArray(data.models)) {
+                modelSelect.innerHTML = '';
+                data.models.forEach(model => {
+                    const opt = document.createElement('option');
+                    opt.value = model.id;
+                    opt.textContent = model.name || model.id;
+                    modelSelect.appendChild(opt);
+                });
+                console.log('[frontend] Loaded', data.models.length, 'models');
+            } else {
+                modelSelect.innerHTML = '<option>No models available</option>';
+                console.log('[frontend] No models available in response');
+            }
+        } catch (err) {
+            modelSelect.innerHTML = '<option>Error loading models</option>';
+            console.error('[frontend] Error loading models:', err);
+        }
+    }
+
+    async sendMessage() {
+        if (this.isLoading) return;
+        const messageInput = document.getElementById('message-input');
+        const message = messageInput.value.trim();
+        if (!message) return;
+        const selectedModel = document.getElementById('model-select').value;
+        this.isLoading = true;
+        this.updateUI();
+        // Add user message to chat
+        this.addMessageToChat('user', message);
+        messageInput.value = '';
+        try {
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Session-ID': this.sessionId,
+                },
+                body: JSON.stringify({
+                    message: message,
+                    model: selectedModel,
+                    max_tokens: 500,
+                }),
+            });
+            const data = await response.json();
+            if (data.success) {
+                this.addMessageToChat('assistant', data.data.response, {
+                    model: data.data.model_used,
+                    neurons: data.data.usage.neurons_used,
+                });
+                this.updateUsageDisplay(data.data.usage);
+            } else {
+                this.showError(data.error.message);
+            }
+        } catch (error) {
+            console.error('Error sending message:', error);
+            this.showError('Failed to send message. Please try again.');
+        } finally {
+            this.isLoading = false;
+            this.updateUI();
+        }
+    }
+
+    addMessageToChat(role, content, meta = {}) {
+        const chatMessages = document.getElementById('chat-messages');
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${role}`;
+        const contentDiv = document.createElement('div');
+        contentDiv.textContent = content;
+        messageDiv.appendChild(contentDiv);
+        if (meta.model || meta.neurons) {
+            const metaDiv = document.createElement('div');
+            metaDiv.className = 'message-meta';
+            const metaText = [];
+            if (meta.model) metaText.push(`Model: ${meta.model.split('/').pop()}`);
+            if (meta.neurons) metaText.push(`Neurons: ${meta.neurons}`);
+            metaDiv.textContent = metaText.join(' • ');
+            messageDiv.appendChild(metaDiv);
+        }
+        chatMessages.appendChild(messageDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    updateUI() {
+        const sendButton = document.getElementById('send-button');
+        const messageInput = document.getElementById('message-input');
+        const loading = document.getElementById('loading');
+        sendButton.disabled = this.isLoading;
+        messageInput.disabled = this.isLoading;
+        if (this.isLoading) {
+            loading.classList.remove('hidden');
+        } else {
+            loading.classList.add('hidden');
+        }
+    }
+
+    async loadUsageStats() {
+        try {
+            const response = await fetch('/api/usage', {
+                headers: {
+                    'X-Session-ID': this.sessionId,
+                },
+            });
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success) {
+                    this.updateUsageDisplay(data.data);
+                }
+            }
+        } catch (error) {
+            console.error('Error loading usage stats:', error);
+        }
+    }
+
+    updateUsageDisplay(usage) {
+        const quotaInfo = document.getElementById('quota-info');
+        const remaining = usage.remaining_quota || (usage.quota_limit - usage.daily_neurons_used);
+        const percentage = ((usage.quota_limit - remaining) / usage.quota_limit * 100).toFixed(1);
+        quotaInfo.textContent = `Neurons: ${usage.quota_limit - remaining}/${usage.quota_limit} (${percentage}%) • Requests: ${usage.daily_requests || 0}`;
+    }
+
+    async loadChatHistory() {
+        try {
+            const response = await fetch('/api/history?limit=20', {
+                headers: {
+                    'X-Session-ID': this.sessionId,
+                },
+            });
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success && data.data.messages) {
+                    const chatMessages = document.getElementById('chat-messages');
+                    chatMessages.innerHTML = '';
+                    data.data.messages.forEach(msg => {
+                        this.addMessageToChat(msg.role, msg.content, {
+                            model: msg.model_used,
+                            neurons: msg.neurons_used,
+                        });
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('Error loading chat history:', error);
+        }
+    }
+
+    toggleConfig() {
+        const configPanel = document.getElementById('config-panel');
+        configPanel.classList.toggle('hidden');
+    }
+
+    showError(message) {
+        const chatMessages = document.getElementById('chat-messages');
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'error';
+        errorDiv.textContent = `Error: ${message}`;
+        chatMessages.appendChild(errorDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+}
+
+// Initialize the app when DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    new SimpleAIChat();
+});
+    </script>
+</body>
+</html>
   <script>
     const chatWindow = document.getElementById('chat-window');
     const chatForm = document.getElementById('chat-form');
